@@ -11,9 +11,15 @@
 #include <stdexcept>
 #include <fstream>
 
+#include <ctime>
+#include <cstring>
+
 #include <opencv2/opencv.hpp>
 #include <NvInfer.h>
 
+#include <sys/time.h>
+
+#include "jetsonTX2Power/jetson_tx2_power.hh"
 
 #define MS_PER_SEC 1000.0
 
@@ -33,6 +39,7 @@ void test(const TestConfig &testConfig);
 class TestConfig
 {
 public:
+  string binPath;
   string imagePath;
   string planPath;
   string inputNodeName;
@@ -47,9 +54,11 @@ public:
   string numRuns;
   string useMappedMemory;
   string statsPath;
+  string netName;
   
   TestConfig(int argc, char * argv[])
   {
+    binPath = argv[0];
     imagePath = argv[1];
     planPath = argv[2];
     inputNodeName = argv[3];
@@ -64,11 +73,13 @@ public:
     workspaceSize = argv[12];
     useMappedMemory = argv[13];
     statsPath = argv[14];
+    netName = argv[15];
   }
 
   static string UsageString()
   {
     string s = "";
+    s += "binPath: \n";
     s += "imagePath: \n";
     s += "planPath: \n";
     s += "inputNodeName: \n";
@@ -83,6 +94,7 @@ public:
     s += "workspaceSize: \n";
     s += "useMappedMemory: \n";
     s += "statsPath: \n";
+    s += "netName: \n";
     return s;
 
   }
@@ -90,6 +102,7 @@ public:
   string ToString()
   {
     string s = "";
+    s += "binPath: " + binPath + "\n";
     s += "imagePath: " + imagePath + "\n";
     s += "planPath: " + planPath + "\n";
     s += "inputNodeName: " + inputNodeName + "\n";
@@ -104,6 +117,7 @@ public:
     s += "workspaceSize: " + workspaceSize + "\n";
     s += "useMappedMemory: " + useMappedMemory + "\n";
     s += "statsPath: " + statsPath + "\n";
+    s += "netName: " + netName + "\n";
     return s;
   }
 
@@ -142,6 +156,7 @@ public:
   int WorkspaceSize() const { return ToInteger(workspaceSize); }
   int NumRuns() const { return ToInteger(numRuns); } 
   int UseMappedMemory() const { return ToInteger(useMappedMemory); } 
+  std::string GetNetName() const { return netName; } 
 };
 
 
@@ -157,7 +172,7 @@ class Logger : public ILogger
 int main(int argc, char * argv[])
 {
 
-  if (argc != 15)
+  if (argc != 16)
   {
     cout << TestConfig::UsageString() << endl;
     return 0;
@@ -248,9 +263,32 @@ size_t argmax(float * tensor, size_t numel)
   return maxIndex;
 }
 
+// It is heretic to use just 2 spaces for indentation. The Linux kernel coding
+// guidelines says we ought to use 8, so we'll use 8!
+std::string get_csv_name(std::string net_name)
+{
+char buf[1024];
+time_t t;
+struct tm *tmp;
+
+	time( &t );
+        tmp = localtime(&t);
+
+        memset(buf, '\0', sizeof(buf));
+	// C++ doesn't have a nice function for this!
+        strftime(buf, sizeof(buf), "%Y-%m-%d-%H-%M-%S", tmp);
+
+	std::string s = buf;
+	s += "-"+net_name+".csv";
+
+	return s;
+}
+
 
 void test(const TestConfig &testConfig)
 {
+  printf("TensorRT version %u.%u.%u, build %u\n", NV_TENSORRT_MAJOR, NV_TENSORRT_MINOR, NV_TENSORRT_PATCH, NV_GIE_VERSION);
+
   ifstream planFile(testConfig.planPath);
   stringstream planBuffer;
   planBuffer << planFile.rdbuf();
@@ -294,6 +332,13 @@ void test(const TestConfig &testConfig)
   bindings[inputBindingIndex] = inputDevice;
   bindings[outputBindingIndex] = outputDevice;
 
+  std::vector<PowerReadingDevice> devices = create_devices();
+
+  std::string csv_filename = get_csv_name(testConfig.GetNetName());
+
+  to_csv(csv_filename, devices, testConfig.GetNetName()+":running empty");
+  to_csv(csv_filename, devices, testConfig.GetNetName()+":begin");
+  
   // run and compute average time over numRuns iterations
   double avgTime = 0;
   for (int i = 0; i < testConfig.NumRuns() + 1; i++)
@@ -320,6 +365,11 @@ void test(const TestConfig &testConfig)
 
     if (i != 0)
       avgTime += MS_PER_SEC * diff.count();
+
+    // This is ridiculous...
+    ostringstream conv;
+    conv << i;
+    to_csv(csv_filename, devices, testConfig.GetNetName()+":run #"+conv.str());
   }
   avgTime /= testConfig.NumRuns();
 
@@ -350,4 +400,6 @@ void test(const TestConfig &testConfig)
   engine->destroy();
   context->destroy();
   runtime->destroy();
+
+  to_csv(csv_filename, devices, testConfig.GetNetName()+":done");
 }

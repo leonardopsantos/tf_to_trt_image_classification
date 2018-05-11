@@ -37,7 +37,8 @@ if __name__ == '__main__':
             str(1), # maxBatchSize 
             str(1 << 20), # workspaceSize 
             str(0), # useMappedMemory 
-            TEST_OUTPUT_PATH
+            TEST_OUTPUT_PATH,
+            net_name
         ]
         print("Running %s" % net_name)
         subprocess.call([TEST_EXE_PATH] + args)

@@ -98,7 +98,6 @@ NETS = {
         'frozen_graph_filename': FROZEN_GRAPHS_DIR + 'vgg_19.pb',
         'trt_convert_status': "works",
         'plan_filename': PLAN_DIR + 'vgg_19.plan',
-        'exclude': True
     },
 
     'inception_v1': {
@@ -317,7 +316,7 @@ NETS = {
         'frozen_graph_filename': FROZEN_GRAPHS_DIR + 'mobilenet_v1_0p5_160.pb',
         'plan_filename': PLAN_DIR + 'mobilenet_v1_0p5_160.plan',
         'preprocess_fn': preprocess_inception,
-        'postprocess_fn': postprocess_inception,
+        'postprocess_fn': postprocess_inception
     },
 
     'mobilenet_v1_0p25_128': {
