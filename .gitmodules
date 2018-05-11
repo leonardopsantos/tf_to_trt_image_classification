@@ -1,3 +1,6 @@
 [submodule "third_party/models"]
 	path = third_party/models
 	url = https://github.com/tensorflow/models.git
+[submodule "src/test/jetsonTX2Power"]
+	path = src/test/jetsonTX2Power
+	url = git@github.com:leonardopsantos/jetsonTX2Power.git
