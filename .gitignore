@@ -1,0 +1,7 @@
+*.csv
+build
+data
+.cproject
+.project
+.settings
+*.pyc
