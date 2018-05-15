@@ -48,6 +48,8 @@ def test(image_list_file, pwr_devices, net_name, net_meta):
     image_list = [x.strip() for x in image_list] 
     path_prefix, path_basename = os.path.split(image_list_file)
 
+    run = 0
+    image_list_len = len(image_list)
     for f_name in image_list:
         image_file_name = path_prefix+'/'+f_name
         if os.path.isfile(image_file_name) != True:
@@ -80,7 +82,13 @@ def test(image_list_file, pwr_devices, net_name, net_meta):
         with open(TEST_OUTPUT_PATH, 'a+') as test_f:
             test_f.write("%s %s\n" % (net_name, avg_time))
 
+        run = run+1
+        
+        sys.stdout.write('\r{0:.0f} % done '.format(100.0*run/image_list_len))
+        sys.stdout.flush()
+
     tx2pwr.to_csv(csv_file, pwr_devices, net_name+':done')
+    print '\n %s:all done!'%net_name
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Measures inference time and power in the Jetson TX2 using TensorRT')
