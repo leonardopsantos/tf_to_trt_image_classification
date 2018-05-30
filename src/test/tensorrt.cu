@@ -42,7 +42,7 @@ void test(const TestConfig &testConfig, cv::Mat & image, ICudaEngine *engine,
 void test(const TestConfig &testConfig, const std::string image_filename);
 void test(const TestConfig &testConfig, cv::Mat & image, ICudaEngine *engine,
         IExecutionContext *context, std::vector<PowerReadingDevice> &devices,
-        std::string csv_filename);
+        std::string csv_filename, std::string image_filename);
 
 class TestConfig {
 public:
@@ -270,19 +270,17 @@ int main(int argc, char * argv[])
 
         // load and preprocess image
         cv::Mat image = cv::imread(image_filename, CV_LOAD_IMAGE_COLOR);
-        cv::cvtColor(image, image, cv::COLOR_BGR2RGB, 3);
-        cv::resize(image, image,
-                cv::Size(testConfig.InputWidth(), testConfig.InputHeight()));
+//        cv::cvtColor(image, image, cv::COLOR_BGR2RGB, 3);
+//        cv::resize(image, image,
+//                cv::Size(testConfig.InputWidth(), testConfig.InputHeight()));
 
 //	test(testConfig, image, engine, context);
 
-        test(testConfig, image, engine, context, pwr_devices, csv_filename);
+        test(testConfig, image, engine, context, pwr_devices, csv_filename, image_filename);
 
 //	test(testConfig, image);
 //	test(testConfig, image_filename);
     }
-
-    to_csv(csv_filename, pwr_devices, testConfig.GetNetName() + ":done");
 
     engine->destroy();
     context->destroy();
@@ -584,10 +582,19 @@ void test(const TestConfig &testConfig, cv::Mat & image, ICudaEngine *engine,
     to_csv(csv_filename, devices, testConfig.GetNetName() + ":done");
 }
 
-void test(const TestConfig &testConfig, cv::Mat & image, ICudaEngine *engine,
+void test(const TestConfig &testConfig, cv::Mat & image_in, ICudaEngine *engine,
         IExecutionContext *context,
-        std::vector<PowerReadingDevice> &pwr_devices, std::string csv_filename)
+        std::vector<PowerReadingDevice> &pwr_devices,
+        std::string csv_filename,
+        std::string image_filename)
 {
+    auto tA = chrono::steady_clock::now();
+
+    cv::Mat image;
+    cv::cvtColor(image_in, image, cv::COLOR_BGR2RGB, 3);
+    cv::resize(image, image,
+            cv::Size(testConfig.InputWidth(), testConfig.InputHeight()));
+
     int inputBindingIndex, outputBindingIndex;
     inputBindingIndex = engine->getBindingIndex(
             testConfig.inputNodeName.c_str());
@@ -621,6 +628,10 @@ void test(const TestConfig &testConfig, cv::Mat & image, ICudaEngine *engine,
     bindings[inputBindingIndex] = inputDevice;
     bindings[outputBindingIndex] = outputDevice;
 
+    std::map<std::string,std::string> xtra_fields;
+
+    auto tB = chrono::steady_clock::now();
+
     // run and compute average time over numRuns iterations
     double avgTime = 0;
     for (int i = 0; i < testConfig.NumRuns() + 1; i++) {
@@ -650,12 +661,26 @@ void test(const TestConfig &testConfig, cv::Mat & image, ICudaEngine *engine,
     // This is ridiculous...
     ostringstream conv;
     conv << avgTime;
-    to_csv(csv_filename, pwr_devices,
-            testConfig.GetNetName() + "-avgTime: " + conv.str());
+    xtra_fields["net name"] = testConfig.GetNetName();
+    xtra_fields["inference time"] = conv.str();
+    xtra_fields["image file"] = image_filename;
+
+    ostringstream conv3;
+    chrono::duration<double> diff_pre;
+    diff_pre=tB-tA;
+    conv3 << MS_PER_SEC * diff_pre.count();
+    xtra_fields["pre time"] = conv3.str();
 
     // save results to file
     int maxCategoryIndex = argmax(output, testConfig.NumOutputCategories())
             + 1001 - testConfig.NumOutputCategories();
+
+    ostringstream conv2;
+    conv2 << maxCategoryIndex;
+    xtra_fields["category"] = conv2.str();
+
+    to_csv(csv_filename, pwr_devices,xtra_fields);
+
     cout << "Most likely category id is " << maxCategoryIndex << endl;
     cout << "Average execution time in ms is " << avgTime << endl;
     ofstream outfile;
