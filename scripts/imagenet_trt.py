@@ -12,6 +12,8 @@ import argparse
 import os.path
 import sys
 
+NUM_RUNS=3
+
 TEST_OUTPUT_PATH='data/test_output_trt.txt'
 TEST_EXE_PATH='./build/src/test/tensorrt'
 
@@ -46,7 +48,7 @@ if __name__ == '__main__':
             net_meta['output_names'][0],
             str(net_meta['num_classes']), 
             net_meta['preprocess_fn'].__name__,
-            str(3), # numRuns
+            str(NUM_RUNS), # numRuns
             "half", # dataType 
             str(1), # maxBatchSize 
             str(1 << 20), # workspaceSize 
